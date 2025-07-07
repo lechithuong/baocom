@@ -1,17 +1,20 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 import psycopg2
-import os
+import urllib.parse
 
 app = Flask(__name__)
 
-# Kết nối database dùng biến môi trường
+# 👉 Kết nối tới Render PostgreSQL
+url = "postgresql://baocom_db_user:oxqGcxc4WLf2ugn5IVqKTvcVSI36NCzs@dpg-d1m4or95pdvs73aef520-a/baocom_db"
+result = urllib.parse.urlparse(url)
+
 conn = psycopg2.connect(
-    dbname=os.environ.get("DB_NAME"),
-    user=os.environ.get("DB_USER"),
-    password=os.environ.get("DB_PASSWORD"),
-    host=os.environ.get("DB_HOST"),
-    port=os.environ.get("DB_PORT", "5432")  # Mặc định là 5432 nếu không đặt
+    dbname=result.path[1:],
+    user=result.username,
+    password=result.password,
+    host=result.hostname,
+    port=result.port
 )
 cursor = conn.cursor()
 
@@ -33,6 +36,3 @@ def bao_com():
     except Exception as e:
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run()
