@@ -8,7 +8,7 @@ app = Flask(__name__)
 conn = psycopg2.connect(
     dbname="baocom_db",
     user="baocom_db_user",
-    password="oxqGcxc4WLf2ugn5IVqKTvcVSI36NCzs",
+    password="Efzezd267275",
     host="dpg-d1m4or95pdvs73aef520-a.singapore-postgres.render.com",
     port="5432"
 )
