@@ -1,20 +1,16 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 import psycopg2
-import urllib.parse
 
 app = Flask(__name__)
 
-# 👉 Kết nối tới Render PostgreSQL
-url = "postgresql://baocom_db_user:oxqGcxc4WLf2ugn5IVqKTvcVSI36NCzs@dpg-d1m4or95pdvs73aef520-a/baocom_db"
-result = urllib.parse.urlparse(url)
-
+# Kết nối đến PostgreSQL trên Render
 conn = psycopg2.connect(
-    dbname=result.path[1:],
-    user=result.username,
-    password=result.password,
-    host=result.hostname,
-    port=result.port
+    dbname="baocom_db",
+    user="baocom_db_user",
+    password="oxqGcxc4WLf2ugn5IVqKTvcVSI36NCzs",
+    host="dpg-d1m4or95pdvs73aef520-a.singapore-postgres.render.com",
+    port="5432"
 )
 cursor = conn.cursor()
 
