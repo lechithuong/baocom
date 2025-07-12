@@ -38,10 +38,10 @@ def bao_com():
         ngay = get_ngay_hop_le(gio)
 
         # Kiểm tra giờ hợp lệ
-        if baocom == "TRUA" and gio > time(15, 30):
-            return jsonify({"status": "error", "message": "Đã quá giờ báo cơm trưa"}), 403
-        if baocom == "TOI" and gio < time(4, 30):
-            return jsonify({"status": "error", "message": "Chưa đến giờ báo cơm tối"}), 403
+        #if baocom == "TRUA" and gio > time(15, 30):
+           # return jsonify({"status": "error", "message": "Đã quá giờ báo cơm trưa"}), 403
+        #if baocom == "TOI" and gio < time(4, 30):
+            #return jsonify({"status": "error", "message": "Chưa đến giờ báo cơm tối"}), 403
 
         # Kiểm tra đã có bao nhiêu bữa ăn hôm nay
         cursor.execute(f"""
