@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime, time
 import psycopg2
+import pytz  # Thêm pytz để dùng múi giờ Việt Nam
 
 app = Flask(__name__)
 
@@ -14,30 +15,33 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
+# Giờ Việt Nam
+vn_tz = pytz.timezone("Asia/Ho_Chi_Minh")
+
 @app.route('/baocom', methods=['POST'])
 def bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        baocom = data.get("baocom").upper()  # "TRƯA", "TỐI" → xử lý thành "TRUA", "TOI"
-        vitri = data.get("vitri").upper()
-        ngaygio = datetime.now()
+        baocom = data.get("baocom").upper()  # "TRƯA", "TỐI" → "TRUA", "TOI"
+        vitri = data.get("vitri").upper().replace(" ", "_")  # Chống lỗi font, ghi rõ
+        ngaygio = datetime.now(vn_tz)
         ngay = ngaygio.date()
         gio = ngaygio.time()
 
-        # Nếu là TỐI mà giờ hiện tại < 12h thì không cho báo
+        # Kiểm tra giới hạn thời gian báo cơm
         if baocom == "TOI" and gio < time(12, 0):
             return jsonify({"status": "error", "message": "Chưa đến giờ báo cơm tối"}), 403
         if baocom == "TRUA" and gio > time(15, 30):
             return jsonify({"status": "error", "message": "Đã quá giờ báo cơm trưa"}), 403
 
-        # Xoá dữ liệu cũ cùng msnv, baocom trong ngày
+        # Xoá bản ghi cũ nếu có
         cursor.execute("""
             DELETE FROM ten_bang 
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
         """, (msnv, baocom, ngay))
 
-        # Ghi mới
+        # Ghi bản ghi mới
         cursor.execute("""
             INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
             VALUES (%s, %s, %s, %s)
@@ -54,12 +58,12 @@ def huy_bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        baocom = data.get("baocom").upper()  # Phải gửi kèm "TRUA" hoặc "TOI"
-        ngaygio = datetime.now()
+        baocom = data.get("baocom").upper()  # "TRUA" hoặc "TOI"
+        ngaygio = datetime.now(vn_tz)
         ngay = ngaygio.date()
         gio = ngaygio.time()
 
-        # Kiểm tra thời gian hợp lệ
+        # Chặn huỷ quá giờ giới hạn
         if baocom == "TRUA" and gio > time(9, 0):
             return jsonify({"status": "error", "message": "Đã quá giờ huỷ báo cơm trưa"}), 403
         if baocom == "TOI" and gio > time(15, 30):
