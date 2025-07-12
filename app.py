@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from datetime import datetime, time, timedelta
+from datetime import datetime
 import psycopg2
 
 app = Flask(__name__)
@@ -16,12 +16,6 @@ cursor = conn.cursor()
 
 TABLE_NAME = "baocom"
 
-def get_ngay_hop_le(gio_hien_tai):
-    if time(4, 30) <= gio_hien_tai <= time(15, 30):
-        return datetime.now().date()
-    else:
-        return (datetime.now() + timedelta(days=1)).date()
-
 @app.route('/baocom', methods=['POST'])
 def bao_com():
     try:
@@ -31,19 +25,12 @@ def bao_com():
         vitri = data.get("vitri", "").strip().upper()
 
         if not msnv or not baocom or not vitri:
-            return jsonify({"status": "error", "message": "Thiếu msnv hoặc baocom hoặc vitri"}), 400
+            return jsonify({"status": "error", "message": "Thiếu msnv, baocom hoặc vitri"}), 400
 
         ngaygio = datetime.now()
-        gio = ngaygio.time()
-        ngay = get_ngay_hop_le(gio)
+        ngay = ngaygio.date()
 
-        # Kiểm tra giờ hợp lệ
-        #if baocom == "TRUA" and gio > time(15, 30):
-           # return jsonify({"status": "error", "message": "Đã quá giờ báo cơm trưa"}), 403
-        #if baocom == "TOI" and gio < time(4, 30):
-            #return jsonify({"status": "error", "message": "Chưa đến giờ báo cơm tối"}), 403
-
-        # Kiểm tra đã có bao nhiêu bữa ăn hôm nay
+        # Kiểm tra số lần đã báo hôm nay
         cursor.execute(f"""
             SELECT COUNT(*) FROM {TABLE_NAME}
             WHERE msnv = %s AND DATE(ngaygio) = %s
@@ -53,13 +40,13 @@ def bao_com():
         if count >= 2:
             return jsonify({"status": "error", "message": "Bạn đã báo đủ 2 bữa hôm nay"}), 403
 
-        # Xóa nếu đã có cùng loại bữa ăn trong ngày
+        # Xoá nếu đã báo cùng bữa hôm nay
         cursor.execute(f"""
             DELETE FROM {TABLE_NAME}
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
         """, (msnv, baocom, ngay))
 
-        # Thêm báo cơm mới
+        # Thêm mới
         cursor.execute(f"""
             INSERT INTO {TABLE_NAME} (msnv, baocom, vitri, ngaygio)
             VALUES (%s, %s, %s, %s)
@@ -70,7 +57,7 @@ def bao_com():
 
     except Exception as e:
         conn.rollback()
-        print("LỖI BAOCOM:", e)
+        print("❌ LỖI BAOCOM:", str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/huybaocom', methods=['POST'])
@@ -84,10 +71,9 @@ def huy_bao_com():
             return jsonify({"status": "error", "message": "Thiếu msnv hoặc baocom"}), 400
 
         ngaygio = datetime.now()
-        gio = ngaygio.time()
-        ngay = get_ngay_hop_le(gio)
+        ngay = ngaygio.date()
 
-        # Xóa báo cơm tương ứng
+        # Xoá báo cơm tương ứng
         cursor.execute(f"""
             DELETE FROM {TABLE_NAME}
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
@@ -98,5 +84,5 @@ def huy_bao_com():
 
     except Exception as e:
         conn.rollback()
-        print("LỖI HUY:", e)
+        print("❌ LỖI HUY:", str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
