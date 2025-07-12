@@ -35,12 +35,6 @@ def bao_com():
         gio = ngaygio.time()
         ngay = get_ngay_hop_le(gio)
 
-        # Kiểm tra giờ báo hợp lệ
-        if baocom == "TRUA" and gio > time(15, 30):
-            return jsonify({"status": "error", "message": "Đã quá giờ báo cơm trưa"}), 403
-        if baocom == "TOI" and gio < time(4, 30):
-            return jsonify({"status": "error", "message": "Chưa đến giờ báo cơm tối"}), 403
-
         # Xóa nếu đã tồn tại dòng tương ứng hôm nay
         cursor.execute(f"""
             DELETE FROM {TABLE_NAME}
@@ -70,12 +64,6 @@ def huy_bao_com():
         gio = ngaygio.time()
         ngay = get_ngay_hop_le(gio)
 
-        # Kiểm tra giờ hủy hợp lệ
-        if baocom == "TRUA" and gio > time(9, 0):
-            return jsonify({"status": "error", "message": "Đã quá giờ huỷ cơm trưa"}), 403
-        if baocom == "TOI" and gio > time(15, 30):
-            return jsonify({"status": "error", "message": "Đã quá giờ huỷ cơm tối"}), 403
-
         # Xóa báo cơm tương ứng
         cursor.execute(f"""
             DELETE FROM {TABLE_NAME}
@@ -86,4 +74,32 @@ def huy_bao_com():
         return jsonify({"status": "huy ok"})
     except Exception as e:
         conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/thongtin', methods=['GET'])
+def thong_tin():
+    try:
+        msnv = request.args.get("msnv")
+        if not msnv:
+            return jsonify({"status": "error", "message": "Thiếu msnv"}), 400
+
+        ngaygio = datetime.now()
+        gio = ngaygio.time()
+        ngay = get_ngay_hop_le(gio)
+
+        cursor.execute(f"""
+            SELECT baocom, vitri, ngaygio
+            FROM {TABLE_NAME}
+            WHERE msnv = %s AND DATE(ngaygio) = %s
+            ORDER BY baocom
+        """, (msnv, ngay))
+
+        rows = cursor.fetchall()
+        result = [
+            {"baocom": r[0], "vitri": r[1], "ngaygio": r[2].strftime("%H:%M:%S")}
+            for r in rows
+        ]
+
+        return jsonify({"status": "ok", "data": result})
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
