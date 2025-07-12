@@ -4,7 +4,6 @@ import psycopg2
 
 app = Flask(__name__)
 
-# Kết nối đến PostgreSQL trên Render
 conn = psycopg2.connect(
     dbname="baocom_db",
     user="baocom_db_user",
@@ -19,36 +18,24 @@ def bao_com():
     data = request.get_json()
     try:
         msnv = data.get('msnv')
-        baocom = data.get('baocom')
-        vitri = data.get('vitri')
-        ngaygio = datetime.now()
+        baocom = data.get('baocom')  # "TRUA" hoặc "TOI"
+        vitri = data.get('vitri')    # "VAN PHONG MS", "THEO TO ANH QUY"
+        ngay = datetime.now().date() # chỉ lấy ngày
 
-        cursor.execute(
-            "INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio) VALUES (%s, %s, %s, %s)",
-            (msnv, baocom, vitri, ngaygio)
-        )
-        conn.commit()
-        return jsonify({"status": "ok"})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# ✅ Thêm route để huỷ báo cơm
-@app.route('/huybaocom', methods=['POST'])
-def huy_bao_com():
-    data = request.get_json()
-    try:
-        msnv = data.get('msnv')
-        vitri = data.get('vitri')
-        today = datetime.now().date()
-
+        # Xoá bản ghi cùng msnv, baocom, và ngày nếu có trước đó
         cursor.execute("""
             DELETE FROM ten_bang
-            WHERE msnv = %s AND vitri = %s AND DATE(ngaygio) = %s
-        """, (msnv, vitri, today))
+            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
+        """, (msnv, baocom, ngay))
 
+        # Ghi bản ghi mới
+        cursor.execute("""
+            INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
+            VALUES (%s, %s, %s, %s)
+        """, (msnv, baocom, vitri, datetime.now()))
+        
         conn.commit()
-        return jsonify({"status": "huy_ok"})
+        return jsonify({"status": "ok"})
     except Exception as e:
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
