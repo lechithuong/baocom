@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime, time
 import psycopg2
-import pytz  # Thêm pytz để dùng múi giờ Việt Nam
+import pytz
 
 app = Flask(__name__)
 
@@ -15,7 +15,7 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-# Giờ Việt Nam
+# Dùng giờ Việt Nam
 vn_tz = pytz.timezone("Asia/Ho_Chi_Minh")
 
 @app.route('/baocom', methods=['POST'])
@@ -23,25 +23,28 @@ def bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        baocom = data.get("baocom").upper()  # "TRƯA", "TỐI" → "TRUA", "TOI"
-        vitri = data.get("vitri").upper().replace(" ", "_")  # Chống lỗi font, ghi rõ
+        baocom = data.get("baocom", "").strip().upper()
+        vitri = data.get("vitri", "").strip().upper().replace(" ", "_")
         ngaygio = datetime.now(vn_tz)
         ngay = ngaygio.date()
         gio = ngaygio.time()
 
-        # Kiểm tra giới hạn thời gian báo cơm
-        if baocom == "TOI" and gio < time(12, 0):
-            return jsonify({"status": "error", "message": "Chưa đến giờ báo cơm tối"}), 403
-        if baocom == "TRUA" and gio > time(15, 30):
-            return jsonify({"status": "error", "message": "Đã quá giờ báo cơm trưa"}), 403
+        if not msnv or not baocom or not vitri:
+            return jsonify({"status": "error", "message": "Thiếu thông tin"}), 400
 
-        # Xoá bản ghi cũ nếu có
+        # Thời gian hợp lệ
+        if baocom == "TRUA" and not (time(6, 0) <= gio <= time(9, 0)):
+            return jsonify({"status": "error", "message": "Chỉ được báo cơm trưa từ 6h đến 9h"}), 403
+        if baocom == "TOI" and not (time(6, 0) <= gio <= time(15, 30)):
+            return jsonify({"status": "error", "message": "Chỉ được báo cơm tối từ 6h đến 15h30"}), 403
+
+        # Xoá dữ liệu cũ
         cursor.execute("""
             DELETE FROM ten_bang 
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
         """, (msnv, baocom, ngay))
 
-        # Ghi bản ghi mới
+        # Ghi mới
         cursor.execute("""
             INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
             VALUES (%s, %s, %s, %s)
@@ -53,21 +56,25 @@ def bao_com():
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 @app.route('/huybaocom', methods=['POST'])
 def huy_bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        baocom = data.get("baocom").upper()  # "TRUA" hoặc "TOI"
+        baocom = data.get("baocom", "").strip().upper()
         ngaygio = datetime.now(vn_tz)
         ngay = ngaygio.date()
         gio = ngaygio.time()
 
-        # Chặn huỷ quá giờ giới hạn
-        if baocom == "TRUA" and gio > time(9, 0):
-            return jsonify({"status": "error", "message": "Đã quá giờ huỷ báo cơm trưa"}), 403
-        if baocom == "TOI" and gio > time(15, 30):
-            return jsonify({"status": "error", "message": "Đã quá giờ huỷ báo cơm tối"}), 403
+        if not msnv or not baocom:
+            return jsonify({"status": "error", "message": "Thiếu thông tin"}), 400
+
+        # Thời gian huỷ hợp lệ
+        if baocom == "TRUA" and not (time(6, 0) <= gio <= time(9, 0)):
+            return jsonify({"status": "error", "message": "Chỉ được huỷ cơm trưa từ 6h đến 9h"}), 403
+        if baocom == "TOI" and not (time(6, 0) <= gio <= time(15, 30)):
+            return jsonify({"status": "error", "message": "Chỉ được huỷ cơm tối từ 6h đến 15h30"}), 403
 
         cursor.execute("""
             DELETE FROM ten_bang 
