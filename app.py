@@ -32,3 +32,23 @@ def bao_com():
     except Exception as e:
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
+
+# ✅ Thêm route để huỷ báo cơm
+@app.route('/huybaocom', methods=['POST'])
+def huy_bao_com():
+    data = request.get_json()
+    try:
+        msnv = data.get('msnv')
+        vitri = data.get('vitri')
+        today = datetime.now().date()
+
+        cursor.execute("""
+            DELETE FROM ten_bang
+            WHERE msnv = %s AND vitri = %s AND DATE(ngaygio) = %s
+        """, (msnv, vitri, today))
+
+        conn.commit()
+        return jsonify({"status": "huy_ok"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
