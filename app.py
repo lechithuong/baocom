@@ -28,13 +28,11 @@ def bao_com():
         ngaygio = datetime.now(tz)
         ngay = ngaygio.date()
 
-        # Xoá dữ liệu cũ trong ngày của cùng msnv + baocom
         cursor.execute("""
             DELETE FROM ten_bang 
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
         """, (msnv, baocom, ngay))
 
-        # Ghi mới
         cursor.execute("""
             INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
             VALUES (%s, %s, %s, %s)
@@ -46,7 +44,6 @@ def bao_com():
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
 @app.route('/huybaocom', methods=['POST'])
 def huy_bao_com():
     data = request.get_json()
@@ -56,7 +53,6 @@ def huy_bao_com():
         ngaygio = datetime.now(tz)
         ngay = ngaygio.date()
 
-        # Xoá dữ liệu
         cursor.execute("""
             DELETE FROM ten_bang 
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
@@ -66,4 +62,27 @@ def huy_bao_com():
         return jsonify({"status": "huy ok"})
     except Exception as e:
         conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ✅ NEW: Xem thông tin đã báo hôm nay
+@app.route('/xemthongtin', methods=['POST'])
+def xem_thong_tin():
+    data = request.get_json()
+    try:
+        msnv = data.get("msnv")
+        ngaygio = datetime.now(tz)
+        ngay = ngaygio.date()
+
+        cursor.execute("""
+            SELECT baocom, vitri FROM ten_bang 
+            WHERE msnv = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
+        """, (msnv, ngay))
+        rows = cursor.fetchall()
+
+        result = {}
+        for row in rows:
+            result[row[0]] = row[1]
+
+        return jsonify(result)
+    except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
