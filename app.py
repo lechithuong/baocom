@@ -15,14 +15,10 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 
 def tinh_ngay_hop_le():
-    now = datetime.now()
+    now = datetime.utcnow() + timedelta(hours=7)
     gio = now.time()
-
     if time(15, 30) <= gio or gio < time(6, 0):
-        if gio < time(0, 0):  # Trước nửa đêm
-            return now.date() + timedelta(days=1)
-        else:  # Sau nửa đêm
-            return now.date()
+        return now.date() + timedelta(days=1)
     return now.date()
 
 @app.route('/baocom', methods=['POST'])
@@ -30,29 +26,26 @@ def bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        baocom = data.get("baocom").upper()  # TRUA hoặc TOI
+        baocom = data.get("baocom").upper()
         vitri = data.get("vitri").upper()
-        ngaygio = datetime.now()
+        ngaygio = datetime.utcnow() + timedelta(hours=7)
         gio = ngaygio.time()
         ngay = tinh_ngay_hop_le()
 
-        # Kiểm tra điều kiện giờ báo hợp lệ
         if baocom == "TRUA" and time(6, 0) <= gio < time(9, 0):
-            pass  # ok báo cơm trưa
+            pass
         elif baocom == "TOI" and time(6, 0) <= gio < time(15, 30):
-            pass  # ok báo cơm tối
+            pass
         elif time(15, 30) <= gio or gio < time(6, 0):
-            pass  # cho phép báo trước cho ngày mai
+            pass
         else:
             return jsonify({"status": "error", "message": "Ngoài giờ báo cơm"}), 403
 
-        # Xoá cũ trước khi ghi mới
         cursor.execute("""
             DELETE FROM ten_bang 
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
         """, (msnv, baocom, ngay))
 
-        # Ghi mới
         cursor.execute("""
             INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
             VALUES (%s, %s, %s, %s)
@@ -69,22 +62,20 @@ def huy_bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        baocom = data.get("baocom").upper()  # TRUA hoặc TOI
-        ngaygio = datetime.now()
+        baocom = data.get("baocom").upper()
+        ngaygio = datetime.utcnow() + timedelta(hours=7)
         gio = ngaygio.time()
         ngay = tinh_ngay_hop_le()
 
-        # Kiểm tra thời gian huỷ hợp lệ
         if baocom == "TRUA" and time(6, 0) <= gio < time(9, 0):
-            pass  # được huỷ
+            pass
         elif baocom == "TOI" and time(6, 0) <= gio < time(15, 30):
-            pass  # được huỷ
+            pass
         elif time(15, 30) <= gio or gio < time(6, 0):
-            pass  # huỷ báo cơm hôm sau
+            pass
         else:
             return jsonify({"status": "error", "message": "Ngoài giờ huỷ báo cơm"}), 403
 
-        # Xoá dòng báo cơm
         cursor.execute("""
             DELETE FROM ten_bang 
             WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
