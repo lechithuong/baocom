@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 import psycopg2
+import pytz
 
 app = Flask(__name__)
 
@@ -14,75 +15,55 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-TABLE_NAME = "baocom"
+# Thiết lập múi giờ Việt Nam
+tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
 @app.route('/baocom', methods=['POST'])
 def bao_com():
+    data = request.get_json()
     try:
-        data = request.get_json()
         msnv = data.get("msnv")
-        baocom = data.get("baocom", "").strip().upper()
-        vitri = data.get("vitri", "").strip().upper()
-
-        if not msnv or not baocom or not vitri:
-            return jsonify({"status": "error", "message": "Thiếu msnv, baocom hoặc vitri"}), 400
-
-        ngaygio = datetime.now()
+        baocom = data.get("baocom").upper().replace("TRƯA", "TRUA").replace("TỐI", "TOI")
+        vitri = data.get("vitri").upper()
+        ngaygio = datetime.now(tz)
         ngay = ngaygio.date()
 
-        # Kiểm tra số lần đã báo hôm nay
-        cursor.execute(f"""
-            SELECT COUNT(*) FROM {TABLE_NAME}
-            WHERE msnv = %s AND DATE(ngaygio) = %s
-        """, (msnv, ngay))
-        count = cursor.fetchone()[0]
-
-        if count >= 2:
-            return jsonify({"status": "error", "message": "Bạn đã báo đủ 2 bữa hôm nay"}), 403
-
-        # Xoá nếu đã báo cùng bữa hôm nay
-        cursor.execute(f"""
-            DELETE FROM {TABLE_NAME}
-            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
+        # Xoá dữ liệu cũ trong ngày của cùng msnv + baocom
+        cursor.execute("""
+            DELETE FROM ten_bang 
+            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
         """, (msnv, baocom, ngay))
 
-        # Thêm mới
-        cursor.execute(f"""
-            INSERT INTO {TABLE_NAME} (msnv, baocom, vitri, ngaygio)
+        # Ghi mới
+        cursor.execute("""
+            INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
             VALUES (%s, %s, %s, %s)
         """, (msnv, baocom, vitri, ngaygio))
 
         conn.commit()
         return jsonify({"status": "ok"})
-
     except Exception as e:
         conn.rollback()
-        print("❌ LỖI BAOCOM:", str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/huybaocom', methods=['POST'])
 def huy_bao_com():
+    data = request.get_json()
     try:
-        data = request.get_json()
         msnv = data.get("msnv")
-        baocom = data.get("baocom", "").strip().upper()
-
-        if not msnv or not baocom:
-            return jsonify({"status": "error", "message": "Thiếu msnv hoặc baocom"}), 400
-
-        ngaygio = datetime.now()
+        baocom = data.get("baocom").upper().replace("TRƯA", "TRUA").replace("TỐI", "TOI")
+        ngaygio = datetime.now(tz)
         ngay = ngaygio.date()
 
-        # Xoá báo cơm tương ứng
-        cursor.execute(f"""
-            DELETE FROM {TABLE_NAME}
-            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio) = %s
+        # Xoá dữ liệu
+        cursor.execute("""
+            DELETE FROM ten_bang 
+            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
         """, (msnv, baocom, ngay))
 
         conn.commit()
         return jsonify({"status": "huy ok"})
-
     except Exception as e:
         conn.rollback()
-        print("❌ LỖI HUY:", str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
