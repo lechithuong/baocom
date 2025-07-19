@@ -9,68 +9,80 @@ app = Flask(__name__)
 conn = psycopg2.connect(
     dbname="baocom_db",
     user="baocom_db_user",
-    password="oxqGcxc4WLf2ugn5IVqKTvcVSI",
-    host="dpg-cnlt8en109ks73d9uf4g-a.oregon-postgres.render.com",
-    port="5432",
-    sslmode="require"
+    password="oxqGcxc4WLf2ugn5IVqKTvcVSI36NCzs",
+    host="dpg-d1m4or95pdvs73aef520-a.singapore-postgres.render.com",
+    port="5432"
 )
-
 cursor = conn.cursor()
 
-# Set múi giờ Việt Nam
+# Thiết lập múi giờ Việt Nam
 tz = pytz.timezone('Asia/Ho_Chi_Minh')
-
 
 @app.route('/baocom', methods=['POST'])
 def bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        timestamp = datetime.now(tz)
+        baocom = data.get("baocom").upper().replace("TRƯA", "TRUA").replace("TỐI", "TOI")
+        vitri = data.get("vitri").upper()
+        ngaygio = datetime.now(tz)
+        ngay = ngaygio.date()
 
-        cursor.execute("INSERT INTO baocom (msnv, timestamp) VALUES (%s, %s)", (msnv, timestamp))
+        cursor.execute("""
+            DELETE FROM ten_bang 
+            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
+        """, (msnv, baocom, ngay))
+
+        cursor.execute("""
+            INSERT INTO ten_bang (msnv, baocom, vitri, ngaygio)
+            VALUES (%s, %s, %s, %s)
+        """, (msnv, baocom, vitri, ngaygio))
+
         conn.commit()
-
-        return jsonify({"status": "ok", "message": "Đã báo cơm thành công!"})
+        return jsonify({"status": "ok"})
     except Exception as e:
+        conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 @app.route('/huybaocom', methods=['POST'])
 def huy_bao_com():
     data = request.get_json()
     try:
         msnv = data.get("msnv")
-        today = datetime.now(tz).date()
+        baocom = data.get("baocom").upper().replace("TRƯA", "TRUA").replace("TỐI", "TOI")
+        ngaygio = datetime.now(tz)
+        ngay = ngaygio.date()
 
-        # Xoá các bản ghi của hôm nay
-        cursor.execute("DELETE FROM baocom WHERE msnv = %s AND DATE(timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s",
-                       (msnv, today))
+        cursor.execute("""
+            DELETE FROM ten_bang 
+            WHERE msnv = %s AND baocom = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
+        """, (msnv, baocom, ngay))
+
         conn.commit()
-
-        return jsonify({"status": "ok", "message": "Đã huỷ báo cơm hôm nay!"})
+        return jsonify({"status": "huy ok"})
     except Exception as e:
+        conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
-@app.route('/login', methods=['POST'])
-def login():
+# ✅ NEW: Xem thông tin đã báo hôm nay
+@app.route('/xemthongtin', methods=['POST'])
+def xem_thong_tin():
     data = request.get_json()
     try:
-        username = data.get("username")
-        password = data.get("password")
+        msnv = data.get("msnv")
+        ngaygio = datetime.now(tz)
+        ngay = ngaygio.date()
 
-        cursor.execute("SELECT * FROM accounts WHERE username = %s AND password = %s", (username, password))
-        user = cursor.fetchone()
+        cursor.execute("""
+            SELECT baocom, vitri FROM ten_bang 
+            WHERE msnv = %s AND DATE(ngaygio AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s
+        """, (msnv, ngay))
+        rows = cursor.fetchall()
 
-        if user:
-            return jsonify({"status": "ok", "message": "Đăng nhập thành công"})
-        else:
-            return jsonify({"status": "fail", "message": "Sai tài khoản hoặc mật khẩu"}), 401
+        result = {}
+        for row in rows:
+            result[row[0]] = row[1]
 
+        return jsonify(result)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
-if __name__ == '__main__':
-    app.run(debug=True)
