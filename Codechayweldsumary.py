@@ -4,7 +4,7 @@ import time
 T3 = 0.2  # thời gian chờ giữa các thao tác
 T4 =0.6
 T5=2 # thời gian đợi tối đang khi không thấy màu
-n = 99  # số lần lặp lại
+n = 100  # số lần lặp lại
 
 for i in range(n):
     # Copy số summary report từ Excel
@@ -71,7 +71,7 @@ for i in range(n):
             time.sleep(T3)
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(T3)
-            pyautogui.click(1091, 814)  # Click Save
+            pyautogui.click(1260, 828)  # Click Save
             break       
             
            
