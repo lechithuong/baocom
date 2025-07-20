@@ -7,14 +7,15 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # cần thiết để dùng session
 
 # Kết nối PostgreSQL
-conn = psycopg2.connect(
-    dbname="baocom_db",
-    user="baocom_db_user",
-    password="oxqGcxc4WLf2ugn5IVqKTvcVSI",
-    host="dpg-d1m4or95pdvs73aef520-a.singapore-postgres.render.com",
-    port="5432"
-)
-
+def get_db_connection():
+    return psycopg2.connect(
+        dbname="baocom_db",
+        user="baocom_db_user",
+        password="oxqGcxc4WLf2ugn5IVqKTvcVSI36NCzs",
+        host="dpg-d1m4or95pdvs73aef520-a.singapore-postgres.render.com",
+        port="5432",
+        sslmode="require"  # ← Rất quan trọng!
+    )
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
