@@ -11,7 +11,7 @@ conn = psycopg2.connect(
     dbname="baocom_db",
     user="baocom_db_user",
     password="oxqGcxc4WLf2ugn5IVqKTvcVSI",
-    host="localhost",  # hoặc tên host render nếu deploy
+    host="dpg-d1m4or95pdvs73aef520-a.singapore-postgres.render.com",
     port="5432"
 )
 
