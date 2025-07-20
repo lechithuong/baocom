@@ -1,191 +1,191 @@
 from flask import Flask, request, jsonify
-from datetime import datetime
 import psycopg2
+from datetime import datetime
 import pytz
 from functools import wraps
 
 app = Flask(__name__)
 
-# Kết nối PostgreSQL
+# Thiết lập múi giờ Việt Nam
+tz = pytz.timezone('Asia/Ho_Chi_Minh')
+
+# Hàm kết nối database
 def get_db_connection():
     return psycopg2.connect(
         dbname="baocom_db",
         user="baocom_db_user",
         password="oxqGcxc4WLf2ugn5IVqKTvcVSI",
-        host="dpg-cnlt8en109ks73d9uf4g-a.oregon-postgres.render.com",
-        port="5432",
-        sslmode="require"
+        host="dpg-cob8g8v109ks739ol6f0-a.singapore-postgres.render.com",
+        port="5432"
     )
 
-# Set múi giờ Việt Nam
-tz = pytz.timezone('Asia/Ho_Chi_Minh')
+# Hàm kiểm tra token đơn giản (có thể nâng cấp lên JWT sau)
+def validate_token(username, token):
+    # Trong thực tế nên kiểm tra token trong database hoặc dùng JWT
+    return True
 
-# Biến toàn cục lưu trữ token đơn giản (dùng cho demo)
-user_tokens = {}
-
-def token_required(f):
-    """Decorator đơn giản để kiểm tra token"""
+# Decorator kiểm tra đăng nhập
+def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        data = request.get_json()
+        username = data.get("username")
         token = request.headers.get('Authorization')
-        if not token or token not in user_tokens.values():
-            return jsonify({"status": "error", "message": "Yêu cầu đăng nhập"}), 401
+        
+        if not username or not token or not validate_token(username, token):
+            return jsonify({"message": "Yêu cầu đăng nhập"}), 401
         return f(*args, **kwargs)
     return decorated
 
-@app.route('/login', methods=['POST'])
+@app.route("/login", methods=["POST"])
 def login():
-    """Đăng nhập với username/password dạng text"""
+    """Đăng nhập với username/password"""
     data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"message": "Vui lòng nhập username và password"}), 400
+
     try:
-        username = data.get("username")
-        password = data.get("password")
-
-        if not username or not password:
-            return jsonify({"status": "error", "message": "Vui lòng nhập đủ username và password"}), 400
-
         conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Kiểm tra tài khoản (không mã hóa password)
-        cursor.execute(
-            "SELECT username FROM accounts WHERE username = %s AND password = %s",
+        cur = conn.cursor()
+        
+        # Kiểm tra tài khoản
+        cur.execute(
+            "SELECT username FROM accounts WHERE username = %s AND password = %s", 
             (username, password)
         )
-        
-        if cursor.fetchone():
+        account = cur.fetchone()
+
+        if account:
             # Tạo token đơn giản (trong thực tế nên dùng JWT)
-            token = f"simple-token-{username}-{datetime.now().timestamp()}"
-            user_tokens[username] = token
-            
+            token = f"token-{username}-{datetime.now().timestamp()}"
             return jsonify({
-                "status": "success",
                 "message": "Đăng nhập thành công",
-                "token": token,
-                "username": username
+                "username": username,
+                "token": token
             })
         else:
-            return jsonify({"status": "error", "message": "Sai tài khoản hoặc mật khẩu"}), 401
+            return jsonify({"message": "Sai tài khoản hoặc mật khẩu"}), 401
 
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Lỗi hệ thống: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
-        cursor.close()
+        cur.close()
         conn.close()
 
-@app.route('/baocom', methods=['POST'])
-@token_required
+@app.route("/baocom", methods=["POST"])
+@login_required
 def bao_com():
-    """Báo cơm (yêu cầu đã đăng nhập)"""
+    """Đăng ký báo cơm"""
     data = request.get_json()
-    try:
-        msnv = data.get("msnv")
-        if not msnv:
-            return jsonify({"status": "error", "message": "Thiếu mã số nhân viên"}), 400
+    msnv = data.get("msnv")
+    
+    if not msnv:
+        return jsonify({"message": "Thiếu mã số nhân viên"}), 400
 
+    try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cur = conn.cursor()
 
         # Kiểm tra đã báo cơm hôm nay chưa
         today = datetime.now(tz).date()
-        cursor.execute(
-            "SELECT id FROM baocom WHERE msnv = %s AND DATE(timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s",
+        cur.execute(
+            "SELECT id FROM baocom WHERE msnv = %s AND DATE(timestamp) = %s",
             (msnv, today)
         )
         
-        if cursor.fetchone():
-            return jsonify({"status": "error", "message": "Bạn đã báo cơm hôm nay rồi"}), 400
+        if cur.fetchone():
+            return jsonify({"message": "Bạn đã báo cơm hôm nay rồi"}), 400
 
         # Thêm bản ghi báo cơm
-        cursor.execute(
+        cur.execute(
             "INSERT INTO baocom (msnv, timestamp) VALUES (%s, %s)",
             (msnv, datetime.now(tz))
         )
         conn.commit()
 
         return jsonify({
-            "status": "success",
             "message": "Đã báo cơm thành công",
             "time": datetime.now(tz).strftime("%H:%M:%S")
         })
 
     except Exception as e:
         conn.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
-        cursor.close()
+        cur.close()
         conn.close()
 
-@app.route('/huybaocom', methods=['POST'])
-@token_required
+@app.route("/huybaocom", methods=["POST"])
+@login_required
 def huy_bao_com():
-    """Hủy báo cơm (yêu cầu đã đăng nhập)"""
+    """Hủy báo cơm"""
     data = request.get_json()
+    msnv = data.get("msnv")
+    
+    if not msnv:
+        return jsonify({"message": "Thiếu mã số nhân viên"}), 400
+
     try:
-        msnv = data.get("msnv")
-        if not msnv:
-            return jsonify({"status": "error", "message": "Thiếu mã số nhân viên"}), 400
-
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cur = conn.cursor()
 
+        # Xóa báo cơm hôm nay
         today = datetime.now(tz).date()
-        cursor.execute(
-            "DELETE FROM baocom WHERE msnv = %s AND DATE(timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s",
+        cur.execute(
+            "DELETE FROM baocom WHERE msnv = %s AND DATE(timestamp) = %s",
             (msnv, today)
         )
         conn.commit()
 
         return jsonify({
-            "status": "success",
             "message": "Đã hủy báo cơm thành công",
-            "deleted_count": cursor.rowcount
+            "deleted_count": cur.rowcount
         })
 
     except Exception as e:
         conn.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
-        cursor.close()
+        cur.close()
         conn.close()
 
-@app.route('/kiemtrabaocom', methods=['POST'])
-@token_required
-def kiemtra_bao_com():
-    """Kiểm tra trạng thái báo cơm hôm nay"""
+@app.route("/kiemtra", methods=["POST"])
+@login_required
+def kiemtra_baocom():
+    """Kiểm tra trạng thái báo cơm"""
     data = request.get_json()
-    try:
-        msnv = data.get("msnv")
-        if not msnv:
-            return jsonify({"status": "error", "message": "Thiếu mã số nhân viên"}), 400
+    msnv = data.get("msnv")
+    
+    if not msnv:
+        return jsonify({"message": "Thiếu mã số nhân viên"}), 400
 
+    try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cur = conn.cursor()
 
         today = datetime.now(tz).date()
-        cursor.execute(
-            "SELECT timestamp FROM baocom WHERE msnv = %s AND DATE(timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh') = %s",
+        cur.execute(
+            "SELECT timestamp FROM baocom WHERE msnv = %s AND DATE(timestamp) = %s",
             (msnv, today)
         )
         
-        record = cursor.fetchone()
+        record = cur.fetchone()
         if record:
             return jsonify({
-                "status": "success",
                 "da_bao_com": True,
                 "thoi_gian": record[0].strftime("%H:%M:%S")
             })
         else:
-            return jsonify({
-                "status": "success",
-                "da_bao_com": False
-            })
+            return jsonify({"da_bao_com": False})
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
-        cursor.close()
+        cur.close()
         conn.close()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
