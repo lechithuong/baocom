@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import psycopg2
 from psycopg2 import sql
-import hashlib  # Để mã hóa mật khẩu
 
 app = Flask(__name__)
 
@@ -28,7 +27,7 @@ def login():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Truy vấn kiểm tra tài khoản
+        # Truy vấn kiểm tra tài khoản với plain text
         cursor.execute(
             sql.SQL("SELECT password FROM accounts WHERE username = %s"),
             [username]
@@ -37,13 +36,8 @@ def login():
         result = cursor.fetchone()
         
         if result:
-            # Lấy password đã mã hóa từ database
-            hashed_password_db = result[0]
-            
-            # Mã hóa password nhập vào để so sánh (dùng cùng thuật toán khi tạo tài khoản)
-            hashed_password_input = hashlib.sha256(password.encode()).hexdigest()
-            
-            if hashed_password_db == hashed_password_input:
+            stored_password = result[0]
+            if stored_password == password:
                 return jsonify({"status": "success", "message": "Đăng nhập thành công"})
             else:
                 return jsonify({"status": "error", "message": "Sai mật khẩu"}), 401
