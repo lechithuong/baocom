@@ -3,8 +3,8 @@ import time
 
 T3 = 0.2  # thời gian chờ giữa các thao tác
 T4 =0.6
-T5=2 # thời gian đợi tối đang khi không thấy màu
-n = 100  # số lần lặp lại
+T5=5 # thời gian đợi tối đang khi không thấy màu
+n = 1  # số lần lặp lại
 
 for i in range(n):
     # Copy số summary report từ Excel
@@ -42,17 +42,17 @@ for i in range(n):
     time.sleep(T3)
     pyautogui.click(1565, 213)
     time.sleep(T3)
-    # Đợi khi có màu xanh để click Yes, paste, rồi Save
-    #start_time = time.time()
-   # while True:
-        #color3 = pyautogui.pixel(883, 589)
-        #if color3 == (227, 227, 227):
-           #time.sleep(T3)
-            #pyautogui.click(1026, 588)  # Click Yes
-            #time.sleep(T3)
-           # break
-        #elif time.time() - start_time > T5:
-            #break
+    # Nếu có bật cửa số cảnh báo revision thì click
+    start_time = time.time()
+    while True:
+        color3 = pyautogui.pixel(935, 517)
+        if color3 == (243, 243, 243):
+           time.sleep(T3)
+           pyautogui.click(1026, 588)  # Click Yes
+           time.sleep(T3)
+           break
+        elif time.time() - start_time > T5:
+            break
         
     # Đợi khi có màu xanh để click Yes, paste, rồi Save
     while True:
@@ -62,16 +62,16 @@ for i in range(n):
             pyautogui.click(514, 92)  # Click export excel
             break
     while True:
-        color1 = pyautogui.pixel(263, 820)
+        color1 = pyautogui.pixel(263, 993)
         if color1 == (240, 240, 240):
             time.sleep(T3)
-            pyautogui.click(360, 713)  # Click chổ tên
+            pyautogui.click(246, 887)  # Click chổ tên
             time.sleep(T3)
             pyautogui.hotkey('ctrl', 'a')
             time.sleep(T3)
             pyautogui.hotkey('ctrl', 'v')
             time.sleep(T3)
-            pyautogui.click(1260, 828)  # Click Save
+            pyautogui.click(452, 995)  # Click Save
             break       
             
            
